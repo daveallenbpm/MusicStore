@@ -9,20 +9,28 @@ open FsCheck.Xunit
 module Tests =
     [<Fact>]
     let ``Retrieve should return a track``() =
-        let getTrack id = {
+        let getTrack trackId =
+            {   
                 Id = 1
-                Name = "track"
-                Genre = Folk
-                Artist = "artist"
-                Album = "album"
+                Metadata = 
+                {
+                    Name = "Track"
+                    Genre = Folk
+                    Artist = "Artist"
+                    Album = "Album"
+                }
             }
 
-        let expected = {
+        let expected = 
+            {   
                 Id = 1
-                Name = "track"
-                Genre = Folk
-                Artist = "artist"
-                Album = "album"
+                Metadata = 
+                {
+                    Name = "Track"
+                    Genre = Folk
+                    Artist = "Artist"
+                    Album = "Album"
+                }
             }
 
         (retrieve getTrack 1) =! expected
@@ -59,31 +67,34 @@ module RoutingTests =
             responseChecks |> List.iter (fun check -> check httpContext)
         | None -> "Result" =! "was None when expected Some _"
 
-    let checkStatus (expectedStatusCode: HttpCode) (context: HttpContext) =
-        context.response.status =! expectedStatusCode.status
+    module Checks = 
+        let checkStatus (expectedStatusCode: HttpCode) (context: HttpContext) =
+            context.response.status =! expectedStatusCode.status
 
-    let checkContent (expectedContent: string) (context: HttpContext) =
-        match context.response.content with
-        | Bytes bt -> UTF8.toString(bt) =! "Got hello successfully"
-        | _ -> true =! false
+        let checkContent (expectedContent: string) (context: HttpContext) =
+            match context.response.content with
+            | Bytes bt -> UTF8.toString(bt) =! "Got hello successfully"
+            | _ -> true =! false
         
         
-    [<Fact>]
-    let ``When we search for a route that doesn't exist, we get a 404 response``() =
+    [<Property>]
+    let ``When we search for a route that doesn't exist, we get a 404 response``
+        (httpMethod: HttpMethod) =
+
         let checks = 
             [
-                checkStatus HttpCode.HTTP_404
+                Checks.checkStatus HttpCode.HTTP_404
             ]
 
-        routeTestHelper Routes.routes HttpMethod.GET "http://musicstore.com/notfound" checks
+        routeTestHelper Routes.routes httpMethod "http://musicstore.com/notfound" checks
 
     [<Fact>]
     let ``When we have a GET request for hello, we get a 200 and some content``() =
 
         let checks =
             [
-                checkStatus HttpCode.HTTP_200
-                checkContent "Got hello successfully"
+                Checks.checkStatus HttpCode.HTTP_200
+                Checks.checkContent "Got hello successfully"
             ]
 
         routeTestHelper Routes.routes HttpMethod.GET "http://musicstore.com/hello" checks

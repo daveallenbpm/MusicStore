@@ -8,18 +8,25 @@ type Genre =
 | Classical
 
 type TrackMetadata = {
-    Id: int
     Name: string
     Genre: Genre
     Artist: string
     Album: string
 }
 
+type Track = {
+    Id: int
+    Metadata: TrackMetadata
+}
+
 let getTrackMetadata trackId =
     {   
         Id = 1
-        Name = "Track"
-        Genre = Folk
-        Artist = "Artist"
-        Album = "Album"
+        Metadata = {
+            Name = "Track"
+            Genre = Folk
+            Artist = "Artist"
+            Album = "Album"
+        }
     }
+
