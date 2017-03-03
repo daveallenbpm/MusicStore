@@ -1,6 +1,5 @@
 ﻿// Learn more about F# at http://fsharp.org
-// See the 'F# Tutorial' project for more help.
-
+// See the 'F# Tutorial' project for more help. 
 open System
 open System.Threading
 
@@ -9,7 +8,7 @@ open Suave
 open MusicStore
 
 [<EntryPoint>]
-let main argv = 
+let main argv =
     let cts = new CancellationTokenSource()
     let conf = { defaultConfig with cancellationToken = cts.Token }
     let listening, server = startWebServerAsync conf Routes.routes

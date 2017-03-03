@@ -55,6 +55,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="DataLayer.fs" />
     <Compile Include="ApiModel.fs" />
     <Compile Include="Routes.fs" />
     <None Include="App.config" />

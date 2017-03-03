@@ -1,6 +1,7 @@
 ﻿namespace MusicStore.Test.Unit.ApiModel
 
 open MusicStore.ApiModel
+open MusicStore.DataLayer
 open Swensen.Unquote
 open Xunit
 open FsCheck.Xunit
@@ -9,6 +10,7 @@ module Tests =
     [<Fact>]
     let ``Retrieve should return a track``() =
         let getTrack id = {
+                Id = 1
                 Name = "track"
                 Genre = Folk
                 Artist = "artist"
@@ -16,6 +18,7 @@ module Tests =
             }
 
         let expected = {
+                Id = 1
                 Name = "track"
                 Genre = Folk
                 Artist = "artist"
@@ -31,29 +34,16 @@ module Tests =
         let getTrack (x:int) = trackMetadata
         (retrieve getTrack trackNumber) =! trackMetadata
 
-module RoutesTests =
+module RoutingTests =
     open Suave.Http
 
-    open MusicStore.Routes
+    open MusicStore
 
-    [<Fact>]
-    let ``When we have an empty request, we get a 404 response``() =
-        let context = HttpContext.empty
-        let asyncResult = routes context
-
-        let result = Async.RunSynchronously(asyncResult)
-        
-        match result with
-        | Some httpContext -> httpContext.response.status =! HttpCode.HTTP_404.status
-        | None -> "Result" =! "was None when expected Some _"
-
-    [<Fact>]
-    let ``When we have a GET request for hello, we get a 200 and some content``() =
+    let routeTestHelper (routes: WebPart) (httpMethod: HttpMethod) (requestUrl: string) (responseChecks: List<HttpContext -> unit>) =
         let request = {
-                HttpRequest.empty with                   
-                    method = HttpMethod.GET
-                    url = System.Uri("http://localhost:8080/hello")
-                    
+            HttpRequest.empty with                   
+                method = httpMethod
+                url = System.Uri(requestUrl)       
             } 
 
         let context = { 
@@ -66,8 +56,34 @@ module RoutesTests =
         
         match result with
         | Some httpContext -> 
-            httpContext.response.status =! HttpCode.HTTP_200.status
-            match httpContext.response.content with
-            | Bytes bt -> UTF8.toString(bt) =! "Got hello successfully"
-            | _ -> true =! false
+            responseChecks |> List.iter (fun check -> check httpContext)
         | None -> "Result" =! "was None when expected Some _"
+
+    let checkStatus (expectedStatusCode: HttpCode) (context: HttpContext) =
+        context.response.status =! expectedStatusCode.status
+
+    let checkContent (expectedContent: string) (context: HttpContext) =
+        match context.response.content with
+        | Bytes bt -> UTF8.toString(bt) =! "Got hello successfully"
+        | _ -> true =! false
+        
+        
+    [<Fact>]
+    let ``When we search for a route that doesn't exist, we get a 404 response``() =
+        let checks = 
+            [
+                checkStatus HttpCode.HTTP_404
+            ]
+
+        routeTestHelper Routes.routes HttpMethod.GET "http://musicstore.com/notfound" checks
+
+    [<Fact>]
+    let ``When we have a GET request for hello, we get a 200 and some content``() =
+
+        let checks =
+            [
+                checkStatus HttpCode.HTTP_200
+                checkContent "Got hello successfully"
+            ]
+
+        routeTestHelper Routes.routes HttpMethod.GET "http://musicstore.com/hello" checks

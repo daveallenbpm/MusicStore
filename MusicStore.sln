@@ -7,6 +7,13 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MusicStore", "MusicStore\Mu
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MusicStore.Test.Unit", "MusicStore.Test.Unit\MusicStore.Test.Unit.fsproj", "{02E1B10F-042B-4424-97AC-E13FA4B075CA}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Build", "Build", "{9CD92538-BA0E-4AC3-BD98-6D3875E0BC84}"
+	ProjectSection(SolutionItems) = preProject
+		build.cmd = build.cmd
+		build.fsx = build.fsx
+		runTests.cmd = runTests.cmd
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
