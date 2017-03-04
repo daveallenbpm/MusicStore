@@ -7,6 +7,7 @@ type Genre =
 | Metal
 | Classical
 
+[<CLIMutable>]
 type TrackMetadata = {
     Name: string
     Genre: Genre
@@ -14,15 +15,17 @@ type TrackMetadata = {
     Album: string
 }
 
+[<CLIMutable>]
 type Track = {
     Id: int
     Metadata: TrackMetadata
 }
 
-let getTrackMetadata trackId =
+let getTrack trackId =
     {   
         Id = 1
-        Metadata = {
+        Metadata = 
+        {
             Name = "Track"
             Genre = Folk
             Artist = "Artist"
