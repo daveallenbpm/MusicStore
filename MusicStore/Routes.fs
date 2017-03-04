@@ -1,5 +1,8 @@
 ﻿module MusicStore.Routes
 
+// open System.IO
+// open System.Xml.Serialization
+
 open Suave
 open Suave.Filters
 open Suave.Operators
@@ -31,9 +34,15 @@ type JsonSerializer() =
     interface ISerializer with
         member this.serialize (data: 'a) : string = JsonConvert.SerializeObject data
 
-type XmlSerializer() =
-    interface ISerializer with
-        member this.serialize (data: 'a) : string = "<xml><test></test></xml>"
+//type XmlSerializer() =
+//    interface ISerializer with
+//        member this.serialize (data: 'a) : string =
+//            let serializer = new System.Xml.Serialization.XmlSerializer(typeof<'a>, XmlRootAttribute())
+//            use memory = new MemoryStream()
+//            serializer.Serialize(memory, data)
+//            memory.Position <- 0L
+//            let bytes = memory.ToArray()
+//            UTF8.toString bytes    
 
 type BasicResponse = {
     message: string
@@ -58,11 +67,11 @@ let apiRoutes (serializer: ISerializer) (mimeType: string) =
 
 let routes =
     let jsonSerializer = JsonSerializer() :> ISerializer
-    let xmlSerializer = XmlSerializer() :> ISerializer
+    // let xmlSerializer = XmlSerializer() :> ISerializer
 
     choose
         [ 
             hasHeader ("accept", "application/json") >=> (apiRoutes jsonSerializer"application/json")
-            hasHeader ("accept", "application/xml") >=> (apiRoutes xmlSerializer "application/xml")
+            // hasHeader ("accept", "application/xml") >=> (apiRoutes xmlSerializer "application/xml")
             BAD_REQUEST (createBasicResponse jsonSerializer "Only JSON here you turd.")
         ]
