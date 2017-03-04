@@ -1,6 +1,9 @@
 ﻿namespace MusicStore.Test.Unit
 
+open ROP
+
 open MusicStore
+open MusicStore.DataLayer
 
 open Suave.Http
 
@@ -36,7 +39,7 @@ module RoutingTests =
 
         let checkContent (expectedContent: string) (context: HttpContext) =
             match context.response.content with
-            | Bytes bt -> UTF8.toString(bt) =! "Got hello successfully"
+            | Bytes bt -> UTF8.toString(bt) =! expectedContent
             | _ -> true =! false
         
         
@@ -44,20 +47,60 @@ module RoutingTests =
     let ``When we search for a route that doesn't exist, we get a 404 response``
         (httpMethod: HttpMethod) =
 
-        let checks = 
+        let checks =
             [
                 Checks.checkStatus HttpCode.HTTP_404
             ]
 
-        routeTestHelper Routes.routes httpMethod "http://musicstore.com/notfound" checks
+        let failure (ctx: HttpContext) =
+            async.Return (None)
+
+        routeTestHelper (Routes.routes failure)  httpMethod "http://musicstore.com/notfound" checks
 
     [<Fact>]
-    let ``When we have a GET request for hello, we get a 200 and some content``() =
-
+    let ``Get /track/{id} should return 200 and the track data if the result is found``() =
         let checks =
             [
                 Checks.checkStatus HttpCode.HTTP_200
-                Checks.checkContent "Got hello successfully"
+                Checks.checkContent """{"Id":1,"Metadata":{"Name":"Track","Genre":{"Case":"Folk"},"Artist":"Artist","Album":"Album"}}"""
             ]
 
-        routeTestHelper Routes.routes HttpMethod.GET "http://musicstore.com/hello" checks
+        let mockTrack = {   
+            Id = 1
+            Metadata = 
+            {
+                Name = "Track"
+                Genre = Folk
+                Artist = "Artist"
+                Album = "Album"
+            }
+        }
+
+        let serializer = Routes.JsonSerializer()
+        let routeToCheck = Routes.getTrackById serializer (fun id -> Success mockTrack)
+
+        routeTestHelper (Routes.routes routeToCheck) HttpMethod.GET "http://musicstore.com/track/1" checks
+
+    [<Fact>]
+    let ``Get /track/{id} should return 404 if the requested track is not found``()=
+        let checks =
+            [
+                Checks.checkStatus HttpCode.HTTP_404
+            ]
+
+        let serializer = Routes.JsonSerializer()
+        let routeToCheck = Routes.getTrackById serializer (fun id -> Failure DataLayer.Error.NotFoundError)
+
+        routeTestHelper (Routes.routes routeToCheck) HttpMethod.GET "http://musicstore.com/track/1" checks
+
+    [<Fact>]
+    let ``Get /track/{id} should return 500 if there is a database error``()=
+        let checks =
+            [
+                Checks.checkStatus HttpCode.HTTP_500
+            ]
+
+        let serializer = Routes.JsonSerializer()
+        let routeToCheck = Routes.getTrackById serializer (fun id -> Failure DataLayer.Error.DatabaseError)
+
+        routeTestHelper (Routes.routes routeToCheck) HttpMethod.GET "http://musicstore.com/track/1" checks

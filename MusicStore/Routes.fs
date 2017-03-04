@@ -1,20 +1,17 @@
 ﻿module MusicStore.Routes
 
-// open System.IO
-// open System.Xml.Serialization
+open ROP
 
 open Suave
 open Suave.Filters
 open Suave.Operators
 open Suave.Successful
+open Suave.ServerErrors
 open Suave.RequestErrors
 
 open Newtonsoft.Json
 
 open MusicStore
-
-let NotFound (message: string) =
-    fun ctx -> { ctx with response = { ctx.response with status = HTTP_404.status; content = Bytes (UTF8.bytes message) }} |> succeed
 
 let hasHeader (header: string * string) (context: HttpContext) =
     let (headerKey, headerValue) = header
@@ -34,16 +31,6 @@ type JsonSerializer() =
     interface ISerializer with
         member this.serialize (data: 'a) : string = JsonConvert.SerializeObject data
 
-//type XmlSerializer() =
-//    interface ISerializer with
-//        member this.serialize (data: 'a) : string =
-//            let serializer = new System.Xml.Serialization.XmlSerializer(typeof<'a>, XmlRootAttribute())
-//            use memory = new MemoryStream()
-//            serializer.Serialize(memory, data)
-//            memory.Position <- 0L
-//            let bytes = memory.ToArray()
-//            UTF8.toString bytes    
-
 type BasicResponse = {
     message: string
 }
@@ -51,27 +38,36 @@ type BasicResponse = {
 let createBasicResponse (s: ISerializer) message : string =
     s.serialize{ message = message }
 
+let getTrackById (serializer: ISerializer) (getTrack: int -> Result<DataLayer.Track, DataLayer.Error>) =
+    let genericResponse message = createBasicResponse serializer message
+    GET >=> pathScan "/track/%i" (fun trackId ->
+        let res = (ApiModel.retrieve getTrack trackId)
+        match res with
+        |Success track ->
+            track
+            |> serializer.serialize 
+            |> OK
+        |Failure err ->
+            match err with
+            | DataLayer.Error.DatabaseError -> INTERNAL_ERROR (genericResponse "Database error :(")
+            | DataLayer.Error.NotFoundError -> NOT_FOUND (genericResponse (sprintf "The requested track with id=%d was not found" trackId))
+    )
+
 let apiRoutes (serializer: ISerializer) (mimeType: string) =
     choose 
         [
-            path "/hello" >=> GET >=> OK "Got hello successfully"
             path "/track" >=> POST >=> hasHeader ("content-type", "application/json") >=> CREATED ((createBasicResponse serializer "Track created"))
-            pathScan "/track/%i" (fun trackId ->
-                    (ApiModel.retrieve DataLayer.getTrack trackId)
-                    |> serializer.serialize
-                    |> OK
-                )
-            path "/eshdui" >=> GET >=> OK (serializer.serialize { message = "12345" })
-            NotFound (createBasicResponse serializer "The resource you're looking for isn't here")
+            (getTrackById serializer DataLayer.getTrack)
+            NOT_FOUND (createBasicResponse serializer "The resource you're looking for isn't here")
         ] >=> Writers.setMimeType (sprintf "%s; charset=utf-8" mimeType)
 
-let routes =
+let jsonApiroutes = apiRoutes (JsonSerializer() :> ISerializer) "application/json"
+
+let routes routesToUse =
     let jsonSerializer = JsonSerializer() :> ISerializer
-    // let xmlSerializer = XmlSerializer() :> ISerializer
 
     choose
         [ 
-            hasHeader ("accept", "application/json") >=> (apiRoutes jsonSerializer"application/json")
-            // hasHeader ("accept", "application/xml") >=> (apiRoutes xmlSerializer "application/xml")
-            BAD_REQUEST (createBasicResponse jsonSerializer "Only JSON here you turd.")
+            hasHeader ("accept", "application/json") >=> routesToUse
+            NOT_FOUND (createBasicResponse jsonSerializer "The endpoint was not found. Try adding Accept:application/json to your request")
         ]
