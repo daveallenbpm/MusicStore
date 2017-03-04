@@ -24,59 +24,59 @@ let hasHeader (header: string * string) (context: HttpContext) =
         | None -> None
     )
 
-let jsonSerialize data =
-    JsonConvert.SerializeObject data
-
-let xmlSerialize data =
-    "<xml><test></test></xml>"
-
 type BasicResponse = {
     message: string
 }
 
-let createBasicResponse (s: 'a -> string) message : string =
-    s { message = message }
+type SerializationType =
+| Json
+| Xml
 
-let useJsonSerializer (f: ('a -> string) -> WebPart) =
-    f jsonSerialize
+type ISerializer =
+    abstract member serialize: 'a -> string
 
-let useXmlSerializer (f: ('a -> string) -> WebPart) =
-    f xmlSerialize
+type JsonSerializer() =
+    interface ISerializer with
+        member this.serialize (data: 'a) : string = JsonConvert.SerializeObject data
 
-let apiRoutes (serialize: ('a -> string)) =
+type XmlSerializer() =
+    interface ISerializer with
+        member this.serialize (data: 'a) : string = "<xml><test></test></xml>"
+
+let createBasicResponse (s: SerializationType) message : string =
+    let serialize =
+        match s with
+        | Json -> (JsonSerializer() :> ISerializer).serialize
+        | Xml -> (XmlSerializer() :> ISerializer).serialize
+    serialize { message = message }
+
+let apiRoutes (serializationType: SerializationType) =
+    let mimeType =
+        match serializationType with
+        | Json -> "application/json"
+        | Xml -> "application/xml"
+        
+    let serializer =
+        match serializationType with
+        | Json -> JsonSerializer() :> ISerializer
+        | Xml -> XmlSerializer() :> ISerializer
     choose 
         [
             path "/hello" >=> GET >=> OK "Got hello successfully"
-            path "/track" >=> POST >=> hasHeader ("content-type", "application/json") >=> CREATED ((createBasicResponse serialize "Track created"))
+            path "/track" >=> POST >=> hasHeader ("content-type", "application/json") >=> CREATED ((createBasicResponse serializationType "Track created"))
             pathScan "/track/%i" (fun trackId ->
                     (ApiModel.retrieve DataLayer.getTrack trackId)
-                    |> serialize
+                    |> serializer.serialize
                     |> OK
                 )
-            NotFound (createBasicResponse serialize "The resource you're looking for isn't here")
-        ] >=> Writers.setMimeType "application/json; charset=utf-8"
+            path "/eshdui" >=> GET >=> OK (serializer.serialize { message = "12345" })
+            NotFound (createBasicResponse serializationType "The resource you're looking for isn't here")
+        ] >=> Writers.setMimeType (sprintf "%s; charset=utf-8" mimeType)
 
 let routes =
     choose
         [ 
-            hasHeader ("accept", "application/json") >=> (apiRoutes jsonSerialize)
-            hasHeader ("accept", "application/xml") >=> (apiRoutes xmlSerialize)
-            BAD_REQUEST (createBasicResponse jsonSerialize "Only JSON here you turd.")
+            hasHeader ("accept", "application/json") >=> (apiRoutes SerializationType.Json)
+            hasHeader ("accept", "application/xml") >=> (apiRoutes SerializationType.Xml)
+            BAD_REQUEST (createBasicResponse SerializationType.Json "Only JSON here you turd.")
         ]
-
-//let test a b c =
-//    [a; b; c]
-//
-//let x = test 1 2 3
-//let y = test "a" "b" "c"
-//
-//let test2<'a> (f: 'a -> 'a -> 'a -> List<'a>) : ('a -> 'a -> 'a -> List<'a>) =
-//    f
-//
-//let resFunc = test2 test
-//let res = resFunc 1 2 3
-//let res = resFunc "a" "b" "c"
-
-let foo (a: string)(b: 'm) =
-    printfn "%A - %A" a b 
-let fooWithA= foo  "hello"
